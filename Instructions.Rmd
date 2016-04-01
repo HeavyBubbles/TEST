@@ -1,0 +1,77 @@
+---
+title: "Limpiado de secuencias"
+author: "Francisco Javier Falcon Chavez"
+date: "1/abril/2016"
+output: 
+  html_document: 
+    keep_md: yes
+---
+```{r,engine='bash',echo=FALSE}
+cd /home/francisco/BioComp/Tarea1/
+```
+
+Primero, se corrió el software FASTQC usando los datos de secuenciación como entrada, teneniendo en cuenta que todos los archivos con la extensión .fastq están almacenados en una carpeta dentro del directorio de trabajo llamada 'RawData'
+
+```{r,engine='bash',results='hide'}
+cd /home/francisco/BioComp/Tarea1/
+
+ls ./RawData/ > ./FASTQC_Analysis/List_Files.txt
+
+for i in $( cat ./FASTQC_Analysis/List_Files.txt ); do
+fastqc -o ./FASTQC_Analysis/ ./RawData/$i
+done
+
+rm ./FASTQC_Analysis/List_Files.txt
+```
+Luego, se descomprimen todos los archivos hechos por FASTQC, para poder revisar el archivo summar.txt y poder decir los siguientes pasos en el tratamiento de los datos
+
+```{r,engine='bash',results='hide'}
+cd /home/francisco/BioComp/Tarea1/
+ls ./FASTQC_Analysis/*zip > ./FASTQC_Analysis/List_Zips.txt
+
+for i in $( cat ./FASTQC_Analysis/List_Zips.txt ); do
+unzip $i -d ./FASTQC_Analysis/
+done
+
+rm ./FASTQC_Analysis/List_Zips.txt
+```
+ Teniendo descomprimidos los datos, podremos revisar cual son las características a grandes rasgos de los datos.
+ 
+ 
+```{r,engine='bash'}
+cd /home/francisco/BioComp/Tarea1/
+cat FASTQC_Analysis/Partial_SRR24671*/summary.txt| cut -f1,2| sort| uniq -c
+```
+
+Podemos observar que todos los archivos presentan una desproporción en el contenido de bases, el cual es probable sea en las primeras bases. Copiando el ejecutable de Trimmommatic y los adaptadores en la carpeta donde se colocarán los archivos tratados, se procede hacer el tratamiento.
+
+```{r,engine='bash'}
+cd /home/francisco/BioComp/Tarea1/Trimmed
+ln -s ../RawData/* ./
+ls *fastq > List_Files.txt
+for i in $( cat ./List_Files.txt ); do
+java -jar ./trimmomatic-0.36.jar SE $i Trimmed_$i HEADCROP:10 SLIDINGWINDOW:4:15 MINLEN:50
+done
+rm List_Files.txt
+```
+Se usaron los parametros por las siguientes razones:  
+1. HEADCROP: Para eliminar el problema del contenido de bases en cada archivo, se eliminarán las diez primeras bases.  
+2. SLIDINGWINDOW: Con este margen, se cree que se obtiendrán secuencias de alta calidad.  
+3. MINLEN: Basado en el parámetro usado en Chang et al. (2014), tratando de descartar la menor cantidad de secuencias útiles y que puedan reconstruir los transcritos de la mejor manera.  
+
+Por último, se generaron los archivos de fastqc para este nuevo set de datos.
+
+```{r,engine='bash',results='hide'}
+cd /home/francisco/BioComp/Tarea1/
+
+ls ./Trimmed/Trimmed* > ./FASTQC_Analysis/List_Files.txt
+
+for i in $( cat ./FASTQC_Analysis/List_Files.txt ); do
+fastqc -o ./FASTQC_Analysis/ $i
+done
+
+rm ./FASTQC_Analysis/List_Files.txt
+```
+
+##Referencias##
+Chang, Z., Wang., Z., & Li, G. (2014). The impacts of read length and transcriptome complexity for de ovo assembly: A simulation study. *PLoS ONE*, 9(4).
